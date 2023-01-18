@@ -1,8 +1,8 @@
 import { expect } from 'chai';
-import stringify from 'fast-safe-stringify';
 import * as hash from 'object-hash';
 import * as sinon from 'sinon';
 import { ModuleTokenFactory } from '../../injector/module-token-factory';
+import { InternalCoreModule } from '../../injector/internal-core-module';
 
 describe('ModuleTokenFactory', () => {
   const moduleId = 'constId';
@@ -16,12 +16,16 @@ describe('ModuleTokenFactory', () => {
     class Module {}
     it('should return expected token', () => {
       const type = Module;
-      const token = factory.create(type, undefined);
-      expect(token).to.be.deep.eq(
+      const hash1 = factory.create(type, undefined);
+      const hash2 = factory.create(type, undefined);
+
+      expect(hash1).to.be.deep.eq(hash2);
+
+      expect(hash1).to.be.deep.eq(
         hash({
           id: moduleId,
           module: Module.name,
-          dynamic: '',
+          dynamic: undefined,
         }),
       );
     });
@@ -35,69 +39,151 @@ describe('ModuleTokenFactory', () => {
         hash({
           id: moduleId,
           module: Module.name,
-          dynamic: stringify({
+          dynamic: {
             providers: [{}],
-          }),
+          },
         }),
       );
+    });
+    it('should output random hash for InternalTokenModule', () => {
+      const hash1 = factory.create(InternalCoreModule, undefined);
+      const hash2 = factory.create(InternalCoreModule, undefined);
+
+      expect(hash1).to.not.be.deep.eq(hash2);
+    });
+    describe('should output the same hash when', () => {
+      it('has symbols', () => {
+        const type = Module;
+
+        const token = factory.create(type, {
+          providers: [
+            {
+              provide: Symbol('a'),
+              useValue: 'a',
+            },
+          ],
+        } as any);
+
+        expect(token).to.be.deep.eq(
+          hash({
+            id: moduleId,
+            module: Module.name,
+            dynamic: {
+              providers: [
+                {
+                  provide: Symbol('a'),
+                  useValue: 'a',
+                },
+              ],
+            },
+          }),
+        );
+      });
+      it('has functions', () => {
+        const type = Module;
+
+        const token = factory.create(type, {
+          providers: [
+            {
+              provide: 'potato',
+              useFactory: () => 'test',
+            },
+            {
+              provide: 'potato2',
+              useFactory: async () => Promise.resolve('test'),
+            },
+          ],
+        } as any);
+
+        expect(token).to.be.deep.eq(
+          hash({
+            id: moduleId,
+            module: Module.name,
+            dynamic: {
+              providers: [
+                {
+                  provide: 'potato',
+                  useFactory: () => 'test',
+                },
+                {
+                  provide: 'potato2',
+                  useFactory: async () => Promise.resolve('test'),
+                },
+              ],
+            },
+          }),
+        );
+      });
+      it('has classes', () => {
+        class Module2 {}
+
+        const type = Module;
+
+        const token = factory.create(type, {
+          providers: [
+            {
+              provide: 'potato',
+              useClass: Module2,
+            },
+          ],
+        } as any);
+
+        expect(token).to.be.deep.eq(
+          hash({
+            id: moduleId,
+            module: Module.name,
+            dynamic: {
+              providers: [
+                {
+                  provide: 'potato',
+                  useClass: Module2,
+                },
+              ],
+            },
+          }),
+        );
+      });
+      it('has circular references', () => {
+        const type = Module;
+
+        const obj: any = { test: true };
+
+        obj.circular = obj;
+
+        const obj2: any = { test: true };
+
+        obj2.circular = obj2;
+
+        const token = factory.create(type, {
+          providers: [
+            {
+              provide: 'potato',
+              useValue: obj,
+            },
+          ],
+        } as any);
+
+        expect(token).to.be.deep.eq(
+          hash({
+            id: moduleId,
+            module: Module.name,
+            dynamic: {
+              providers: [
+                {
+                  provide: 'potato',
+                  useValue: obj2,
+                },
+              ],
+            },
+          }),
+        );
+      });
     });
   });
   describe('getModuleName', () => {
     it('should map module metatype to name', () => {
       const metatype = () => {};
       expect(factory.getModuleName(metatype as any)).to.be.eql(metatype.name);
-    });
-  });
-  describe('getDynamicMetadataToken', () => {
-    describe('when metadata exists', () => {
-      it('should return hash', () => {
-        const metadata = { providers: ['', {}] };
-        expect(factory.getDynamicMetadataToken(metadata as any)).to.be.eql(
-          JSON.stringify(metadata),
-        );
-      });
-      it('should return hash with class', () => {
-        class Provider {}
-        const metadata = { providers: [Provider], exports: [Provider] };
-        expect(factory.getDynamicMetadataToken(metadata)).to.be.eql(
-          '{"providers":["Provider"],"exports":["Provider"]}',
-        );
-      });
-      it('should return hash with value provider with non-class function', () => {
-        const provider = {
-          provide: 'ProvideValue',
-          useValue: function Provider() {},
-        };
-        const metadata = { providers: [provider] };
-        expect(factory.getDynamicMetadataToken(metadata)).to.be.eql(
-          `{"providers":[{"provide":"ProvideValue","useValue":"${hash(
-            provider.useValue.toString(),
-          )}"}]}`,
-        );
-      });
-      it('should serialize symbols in a dynamic metadata object', () => {
-        const metadata = {
-          providers: [
-            {
-              provide: Symbol('a'),
-              useValue: 'a',
-            },
-            {
-              provide: Symbol('b'),
-              useValue: 'b',
-            },
-          ],
-        };
-
-        expect(factory.getDynamicMetadataToken(metadata)).to.be.eql(
-          '{"providers":[{"provide":"Symbol(a)","useValue":"a"},{"provide":"Symbol(b)","useValue":"b"}]}',
-        );
-      });
-    });
-    describe('when metadata does not exist', () => {
-      it('should return empty string', () => {
-        expect(factory.getDynamicMetadataToken(undefined)).to.be.eql('');
-      });
     });
   });
 });
