@@ -3,6 +3,7 @@ import stringify from 'fast-safe-stringify';
 import * as hash from 'object-hash';
 import * as sinon from 'sinon';
 import { ModuleTokenFactory } from '../../injector/module-token-factory';
+import { createHash } from 'crypto';
 
 describe('ModuleTokenFactory', () => {
   const moduleId = 'constId';
@@ -18,11 +19,7 @@ describe('ModuleTokenFactory', () => {
       const type = Module;
       const token = factory.create(type, undefined);
       expect(token).to.be.deep.eq(
-        hash({
-          id: moduleId,
-          module: Module.name,
-          dynamic: '',
-        }),
+        createHash('sha1').update(`${moduleId}_${Module.name}`).digest('hex'),
       );
     });
     it('should include dynamic metadata', () => {
