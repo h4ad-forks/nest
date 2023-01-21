@@ -11,10 +11,9 @@ describe('ModuleCompiler', () => {
     describe('when module is a dynamic module', () => {
       it('should return object with "type" and "dynamicMetadata" property', async () => {
         const obj = { module: 'test', providers: [] };
-        const { module, ...dynamicMetadata } = obj;
         expect(await compiler.extractMetadata(obj as any)).to.be.deep.equal({
-          type: module,
-          dynamicMetadata,
+          type: obj.module,
+          dynamicMetadata: obj,
         });
       });
     });
@@ -23,6 +22,7 @@ describe('ModuleCompiler', () => {
         const type = 'test';
         expect(await compiler.extractMetadata(type as any)).to.be.deep.equal({
           type,
+          dynamicMetadata: undefined,
         });
       });
     });

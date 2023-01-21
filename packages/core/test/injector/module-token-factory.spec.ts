@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import { createHash } from 'crypto';
 import stringify from 'fast-safe-stringify';
 import * as hash from 'object-hash';
 import * as sinon from 'sinon';
@@ -18,86 +19,28 @@ describe('ModuleTokenFactory', () => {
       const type = Module;
       const token = factory.create(type, undefined);
       expect(token).to.be.deep.eq(
-        hash({
-          id: moduleId,
-          module: Module.name,
-          dynamic: '',
-        }),
+        createHash('sha1').update(`${moduleId}_${Module.name}`).digest('hex'),
       );
     });
     it('should include dynamic metadata', () => {
       const type = Module;
-      const token = factory.create(type, {
+      const sameObject = {
         providers: [{}],
-      } as any);
+      } as any;
+      const token = factory.create(type, sameObject);
+      const token2 = factory.create(type, sameObject);
 
-      expect(token).to.be.deep.eq(
-        hash({
-          id: moduleId,
-          module: Module.name,
-          dynamic: stringify({
-            providers: [{}],
-          }),
-        }),
-      );
+      const token3 = factory.create(type, { providers: [{}] } as any);
+
+      expect(token).to.be.deep.eq(token2);
+      expect(token).to.be.deep.eq(token2);
+      expect(token).not.to.be.deep.eq(token3);
     });
   });
   describe('getModuleName', () => {
     it('should map module metatype to name', () => {
       const metatype = () => {};
       expect(factory.getModuleName(metatype as any)).to.be.eql(metatype.name);
-    });
-  });
-  describe('getDynamicMetadataToken', () => {
-    describe('when metadata exists', () => {
-      it('should return hash', () => {
-        const metadata = { providers: ['', {}] };
-        expect(factory.getDynamicMetadataToken(metadata as any)).to.be.eql(
-          JSON.stringify(metadata),
-        );
-      });
-      it('should return hash with class', () => {
-        class Provider {}
-        const metadata = { providers: [Provider], exports: [Provider] };
-        expect(factory.getDynamicMetadataToken(metadata)).to.be.eql(
-          '{"providers":["Provider"],"exports":["Provider"]}',
-        );
-      });
-      it('should return hash with value provider with non-class function', () => {
-        const provider = {
-          provide: 'ProvideValue',
-          useValue: function Provider() {},
-        };
-        const metadata = { providers: [provider] };
-        expect(factory.getDynamicMetadataToken(metadata)).to.be.eql(
-          `{"providers":[{"provide":"ProvideValue","useValue":"${hash(
-            provider.useValue.toString(),
-          )}"}]}`,
-        );
-      });
-      it('should serialize symbols in a dynamic metadata object', () => {
-        const metadata = {
-          providers: [
-            {
-              provide: Symbol('a'),
-              useValue: 'a',
-            },
-            {
-              provide: Symbol('b'),
-              useValue: 'b',
-            },
-          ],
-        };
-
-        expect(factory.getDynamicMetadataToken(metadata)).to.be.eql(
-          '{"providers":[{"provide":"Symbol(a)","useValue":"a"},{"provide":"Symbol(b)","useValue":"b"}]}',
-        );
-      });
-    });
-    describe('when metadata does not exist', () => {
-      it('should return empty string', () => {
-        expect(factory.getDynamicMetadataToken(undefined)).to.be.eql('');
-      });
     });
   });
 });

@@ -23,10 +23,9 @@ export class ModuleCompiler {
     dynamicMetadata?: Partial<DynamicModule> | undefined;
   } {
     if (!this.isDynamicModule(metatype)) {
-      return { type: metatype };
+      return { type: metatype, dynamicMetadata: undefined };
     }
-    const { module: type, ...dynamicMetadata } = metatype;
-    return { type, dynamicMetadata };
+    return { type: metatype.module, dynamicMetadata: metatype };
   }
 
   public isDynamicModule(
